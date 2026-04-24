@@ -27,7 +27,6 @@ jobs:
           filters: |
             source-code:
               - '!**/*.md'
-              - '**/*.md'
 
   preflight-check:
     needs: changes
