@@ -55,7 +55,7 @@ jobs:
       matrix:
         include:
           - { python: "3.13",  maturin-args: "",                    artifact: wheels-abi3-linux-x86_64 }
-          - { python: "3.14t", maturin-args: "-i .venv/bin/python", artifact: wheels-cp314t-linux-x86_64 }
+          - { python: "3.14t", maturin-args: "-i .venv/bin/python3.14t", artifact: wheels-cp314t-linux-x86_64 }
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
