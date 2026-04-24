@@ -71,12 +71,9 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           UV_PYTHON_PREFERENCE=only-managed "$HOME/.local/bin/uv" venv --python ${{ matrix.python }} .venv
 
-      - name: Install maturin
-        run: .venv/bin/pip install maturin
-
       - name: Build wheel
         working-directory: iceoryx2-ffi/python
-        run: ../../.venv/bin/maturin build --release ${{ matrix.maturin-args }} --out ../../dist
+        run: uvx maturin build --release ${{ matrix.maturin-args }} --out ../../dist
 
       - uses: actions/upload-artifact@v4
         with:
