@@ -27,7 +27,7 @@
 //!
 //! let client = service.client_builder()
 //!    // defines behavior when server queue is full in a non-overflowing service
-//!    .unable_to_deliver_strategy(UnableToDeliverStrategy::DiscardSample)
+//!    .unable_to_deliver_strategy(UnableToDeliverStrategy::DiscardData)
 //!    .create()?;
 //!
 //! let request = client.loan_uninit()?;
@@ -425,7 +425,8 @@ impl<
             receiver_max_buffer_size: static_config.max_active_requests_per_client,
             receiver_max_borrowed_samples: static_config.max_active_requests_per_client,
             enable_safe_overflow: static_config.enable_safe_overflow_for_requests,
-            degradation_callback: client_factory.request_degradation_callback,
+            degradation_handler: client_factory.request_degradation_handler,
+            unable_to_deliver_handler: client_factory.unable_to_deliver_handler,
             number_of_samples: number_of_requests,
             max_number_of_segments,
             service_state: service.clone(),
@@ -468,7 +469,7 @@ impl<
                 PolymorphicVec::new(HeapAllocator::global(), number_of_to_be_removed_connections)
                     .expect("Heap allocator provides memory."),
             )),
-            degradation_callback: client_factory.response_degradation_callback,
+            degradation_handler: client_factory.response_degradation_handler,
             message_type_details: static_config.response_message_type_details,
             receiver_max_borrowed_samples: static_config
                 .max_borrowed_responses_per_pending_response,

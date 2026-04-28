@@ -22,7 +22,7 @@
 //!     .open_or_create()?;
 //!
 //! let client = request_response.client_builder()
-//!                     .unable_to_deliver_strategy(UnableToDeliverStrategy::DiscardSample)
+//!                     .unable_to_deliver_strategy(UnableToDeliverStrategy::DiscardData)
 //!                     .create()?;
 //!
 //! # Ok(())
@@ -31,7 +31,10 @@
 
 use super::request_response::PortFactory;
 use crate::{
-    port::{DegradationAction, DegradationCallback, client::Client},
+    port::{
+        DegradationAction, DegradationFn, DegradationHandler, UnableToDeliverFn,
+        UnableToDeliverHandler, client::Client,
+    },
     prelude::UnableToDeliverStrategy,
     service,
 };
@@ -110,8 +113,9 @@ pub struct PortFactoryClient<
 > {
     pub(crate) config: LocalClientConfig,
     pub(crate) preallocate_number_of_requests_override: PreallocatedRequestsOverride<'static>,
-    pub(crate) request_degradation_callback: Option<DegradationCallback<'static>>,
-    pub(crate) response_degradation_callback: Option<DegradationCallback<'static>>,
+    pub(crate) request_degradation_handler: DegradationHandler<'static>,
+    pub(crate) response_degradation_handler: DegradationHandler<'static>,
+    pub(crate) unable_to_deliver_handler: Option<UnableToDeliverHandler<'static>>,
     pub(crate) factory: &'factory PortFactory<
         Service,
         RequestPayload,
@@ -164,8 +168,9 @@ impl<
         Self {
             config: self.config,
             factory: self.factory,
-            request_degradation_callback: None,
-            response_degradation_callback: None,
+            request_degradation_handler: DegradationHandler::new_with(DegradationAction::Warn),
+            response_degradation_handler: DegradationHandler::new_with(DegradationAction::Warn),
+            unable_to_deliver_handler: None,
             preallocate_number_of_requests_override: PreallocatedRequestsOverride::new(|v| v),
         }
     }
@@ -193,8 +198,9 @@ impl<
                 allocation_strategy: AllocationStrategy::Static,
             },
             preallocate_number_of_requests_override: PreallocatedRequestsOverride::new(|v| v),
-            request_degradation_callback: None,
-            response_degradation_callback: None,
+            request_degradation_handler: DegradationHandler::new_with(DegradationAction::Warn),
+            response_degradation_handler: DegradationHandler::new_with(DegradationAction::Warn),
+            unable_to_deliver_handler: None,
             factory,
         }
     }
@@ -229,38 +235,44 @@ impl<
         self
     }
 
-    /// Sets the [`DegradationCallback`] for sending [`RequestMut`](crate::request_mut::RequestMut)
-    /// from the [`Client`]. Whenever a connection to a
-    /// [`Server`](crate::port::server::Server) is corrupted or it seems to be dead, this callback
+    /// Sets the [`DegradationHandler`] for sending [`RequestMut`](crate::request_mut::RequestMut)
+    /// from the [`Client`]. Whenever a request connection to a
+    /// [`Server`](crate::port::server::Server) is corrupted or it seems to be dead, this handler
     /// is called and depending on the returned [`DegradationAction`] measures will be taken.
-    pub fn set_request_degradation_callback<
-        F: Fn(&service::static_config::StaticConfig, u128, u128) -> DegradationAction + 'static,
-    >(
+    pub fn set_request_degradation_handler<F: DegradationFn + 'static>(
         mut self,
-        callback: Option<F>,
+        handler: F,
     ) -> Self {
-        match callback {
-            Some(c) => self.request_degradation_callback = Some(DegradationCallback::new(c)),
-            None => self.request_degradation_callback = None,
-        }
+        self.request_degradation_handler = DegradationHandler::new(handler);
 
         self
     }
 
-    /// Sets the [`DegradationCallback`] for receiving [`Response`](crate::response::Response)s
-    /// from a [`Server`](crate::port::server::Server). Whenever a connection to a
-    /// [`Server`](crate::port::server::Server) is corrupted or it seems to be dead, this callback
+    /// Sets the [`DegradationHandler`] for receiving [`Response`](crate::response::Response)s
+    /// from a [`Server`](crate::port::server::Server). Whenever a response connection to a
+    /// [`Server`](crate::port::server::Server) is corrupted or it seems to be dead, this handler
     /// is called and depending on the returned [`DegradationAction`] measures will be taken.
-    pub fn set_response_degradation_callback<
-        F: Fn(&service::static_config::StaticConfig, u128, u128) -> DegradationAction + 'static,
-    >(
+    pub fn set_response_degradation_handler<F: DegradationFn + 'static>(
         mut self,
-        callback: Option<F>,
+        handler: F,
     ) -> Self {
-        match callback {
-            Some(c) => self.response_degradation_callback = Some(DegradationCallback::new(c)),
-            None => self.response_degradation_callback = None,
-        }
+        self.response_degradation_handler = DegradationHandler::new(handler);
+
+        self
+    }
+
+    /// Sets the [`UnableToDeliverHandler`] of the [`Client`]. Whenever a
+    /// [`RequestMut`](crate::response::Response) cannot be sent to a
+    /// [`crate::port::server::Server`], this handler is called and depending on
+    /// the returned [`UnableToDeliverAction`](crate::port::UnableToDeliverAction),
+    /// measures will be taken.
+    /// If no handler is set, the measures will be determined by the value set in
+    /// [`UnableToDeliverStrategy`].
+    pub fn set_unable_to_deliver_handler<F: UnableToDeliverFn + 'static>(
+        mut self,
+        handler: F,
+    ) -> Self {
+        self.unable_to_deliver_handler = Some(UnableToDeliverHandler::new(handler));
 
         self
     }

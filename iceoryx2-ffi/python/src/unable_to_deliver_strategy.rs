@@ -17,11 +17,11 @@ use pyo3::prelude::*;
 /// Defines the strategy a sender shall pursue when the buffer of the receiver is full
 /// and the service does not overflow.
 pub enum UnableToDeliverStrategy {
-    /// Blocks until the receiver has consumed the
-    /// data from the buffer and there is space again
-    Block,
-    /// Do not deliver the data.
-    DiscardSample,
+    /// Retries until the receiver has consumed some
+    /// data from the full buffer and there is space again
+    RetryUntilDelivered,
+    /// Do not deliver the data to receiver with a full buffer
+    DiscardData,
 }
 
 #[pymethods]
@@ -34,9 +34,11 @@ impl UnableToDeliverStrategy {
 impl From<iceoryx2::prelude::UnableToDeliverStrategy> for UnableToDeliverStrategy {
     fn from(value: iceoryx2::prelude::UnableToDeliverStrategy) -> Self {
         match value {
-            iceoryx2::prelude::UnableToDeliverStrategy::Block => UnableToDeliverStrategy::Block,
-            iceoryx2::prelude::UnableToDeliverStrategy::DiscardSample => {
-                UnableToDeliverStrategy::DiscardSample
+            iceoryx2::prelude::UnableToDeliverStrategy::RetryUntilDelivered => {
+                UnableToDeliverStrategy::RetryUntilDelivered
+            }
+            iceoryx2::prelude::UnableToDeliverStrategy::DiscardData => {
+                UnableToDeliverStrategy::DiscardData
             }
         }
     }
@@ -45,9 +47,11 @@ impl From<iceoryx2::prelude::UnableToDeliverStrategy> for UnableToDeliverStrateg
 impl From<UnableToDeliverStrategy> for iceoryx2::prelude::UnableToDeliverStrategy {
     fn from(value: UnableToDeliverStrategy) -> Self {
         match value {
-            UnableToDeliverStrategy::Block => iceoryx2::prelude::UnableToDeliverStrategy::Block,
-            UnableToDeliverStrategy::DiscardSample => {
-                iceoryx2::prelude::UnableToDeliverStrategy::DiscardSample
+            UnableToDeliverStrategy::RetryUntilDelivered => {
+                iceoryx2::prelude::UnableToDeliverStrategy::RetryUntilDelivered
+            }
+            UnableToDeliverStrategy::DiscardData => {
+                iceoryx2::prelude::UnableToDeliverStrategy::DiscardData
             }
         }
     }

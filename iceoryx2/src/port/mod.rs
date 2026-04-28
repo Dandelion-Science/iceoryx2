@@ -11,6 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use core::fmt::Debug;
+use core::time::Duration;
 
 use tiny_fn::tiny_fn;
 use update_connections::ConnectionFailure;
@@ -44,11 +45,97 @@ pub mod writer;
 /// receiver is full and the service does not overflow.
 pub mod unable_to_deliver_strategy;
 
-use crate::service;
+pub use iceoryx2_cal::zero_copy_connection::UnableToDeliverToReceiverAction;
 
-/// Defines the action a port shall take when an internal failure occurs. Can happen when the
-/// system is corrupted and files are modified by non-iceoryx2 instances. Is used as return value of
-/// the [`DegradationCallback`] to define a custom behavior.
+/// Defines the action that shall be take when data cannot be delivered. Is used as
+/// return value of the [`UnableToDeliverHandler`] and  [`UnableToDeliverFn`] to
+///  define a custom behavior.
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub enum UnableToDeliverAction {
+    /// Use an action which is derived from the
+    /// [`UnableToDeliverStrategy`](crate::port::unable_to_deliver_strategy::UnableToDeliverStrategy)
+    FollowUnableToDeliveryStrategy,
+    /// Retry to send and invoke the handler again, if sending does not succeed
+    Retry,
+    /// Discard the data for the receiver which cause the incident and continue
+    /// to deliver the data to the remaining receivers
+    DiscardData,
+    /// Discard the data for the receiver which caused the incident, continue
+    /// to deliver the data to the remaining receivers;
+    /// return with an error if the data was not delivered to all receivers
+    DiscardDataAndFail,
+}
+
+impl From<UnableToDeliverAction> for UnableToDeliverToReceiverAction {
+    fn from(value: UnableToDeliverAction) -> Self {
+        match value {
+            UnableToDeliverAction::FollowUnableToDeliveryStrategy => {
+                UnableToDeliverToReceiverAction::FollowUnableToDeliveryStrategy
+            }
+            UnableToDeliverAction::Retry => UnableToDeliverToReceiverAction::Retry,
+            UnableToDeliverAction::DiscardData => {
+                UnableToDeliverToReceiverAction::DiscardPointerOffset
+            }
+            UnableToDeliverAction::DiscardDataAndFail => {
+                UnableToDeliverToReceiverAction::DiscardPointerOffsetAndFail
+            }
+        }
+    }
+}
+
+/// The unable to deliver context information passed to the [`UnableToDeliverHandler`]
+pub struct UnableToDeliverInfo {
+    /// The service id, of the sender an receiver participants
+    pub service_id: u128,
+    /// The sender port id, which tries to send data
+    pub sender_port_id: u128,
+    /// The receiver port id, which has a full buffer
+    pub receiver_port_id: u128,
+    /// The number of retries for the running delivery to the receiver port
+    pub retries: u64,
+    /// The elapsed time since the initial retry
+    pub elapsed_time: Duration,
+}
+
+/// The unable to delivery handler invoked by a send function when data cannot be delivered
+/// to a receiver
+///
+/// # Arguments
+///
+/// * UnableToDeliverInfo: is a reference to [`UnableToDeliverInfo`] with additional information
+///   for the user to handle the incident
+///
+/// # Returns
+///
+/// The [`UnableToDeliverAction`] to be taken to mitigate the incident
+pub trait UnableToDeliverFn: Fn(&UnableToDeliverInfo) -> UnableToDeliverAction + Send {}
+
+impl<F: Fn(&UnableToDeliverInfo) -> UnableToDeliverAction + Send> UnableToDeliverFn for F {}
+
+tiny_fn! {
+    /// Defines a custom behavior whenever a port detects a degradation.
+    pub struct UnableToDeliverHandler = Fn(info: &UnableToDeliverInfo) -> UnableToDeliverAction;
+}
+
+unsafe impl Send for UnableToDeliverHandler<'_> {}
+
+impl Debug for UnableToDeliverHandler<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "")
+    }
+}
+
+impl UnableToDeliverHandler<'_> {
+    /// A convenience function that takes a [`UnableToDeliverAction`] and returns a [`UnableToDeliverHandler`].
+    pub fn new_with(action: UnableToDeliverAction) -> Self {
+        Self::new(move |_| action)
+    }
+}
+
+/// Defines the action that shall be take when an degradation is detected. This can happen when
+/// data cannot be delivered, or when the system is corrupted and files are modified by
+/// non-iceoryx2 instances. Is used as return value of the [`DegradationHandler`] to define a
+/// custom behavior.
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum DegradationAction {
     /// Ignore the degradation completely
@@ -56,19 +143,62 @@ pub enum DegradationAction {
     /// Print out a warning as soon as the degradation is detected
     Warn,
     /// Returns a failure in the function the degradation was detected
-    Fail,
+    DegradeAndFail,
 }
+
+/// Defines the cause of a degradation and is a parameter of the [`DegradationHandler`].
+pub enum DegradationCause {
+    /// Connection could not be established
+    FailedToEstablishConnection,
+    /// Connection is corrupted
+    ConnectionCorrupted,
+}
+
+/// The degradation context passed to the [`DegradationHandler`]
+pub struct DegradationInfo {
+    /// The service id, which is involved in the degradation
+    pub service_id: u128,
+    /// The sender port id, which is involved in the degradation
+    pub sender_port_id: u128,
+    /// The receiver port id, which is involved in the degradation
+    pub receiver_port_id: u128,
+}
+
+/// The degradation handler which is invoked when a degradation is detected
+///
+/// # Arguments
+///
+/// * DegradationCause: is the cause that triggered the handler
+/// * DegradationInfo: is a reference to [`DegradationInfo`] with additional information
+///   for the user to handle the incident
+///
+/// # Returns
+///
+/// The [`DegradationAction`] to be taken to mitigate the degradation
+pub trait DegradationFn:
+    Fn(DegradationCause, &DegradationInfo) -> DegradationAction + Send
+{
+}
+
+impl<F: Fn(DegradationCause, &DegradationInfo) -> DegradationAction + Send> DegradationFn for F {}
 
 tiny_fn! {
-    /// Defines a custom behavior whenever a port detects a degregation.
-    pub struct DegradationCallback = Fn(service: &service::static_config::StaticConfig, sender_port_id: u128, receiver_port_id: u128) -> DegradationAction;
+    /// Defines a custom behavior whenever a port detects a degradation.
+    pub struct DegradationHandler = Fn(cause: DegradationCause, context: &DegradationInfo) -> DegradationAction;
 }
 
-unsafe impl Send for DegradationCallback<'_> {}
+unsafe impl Send for DegradationHandler<'_> {}
 
-impl Debug for DegradationCallback<'_> {
+impl Debug for DegradationHandler<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "")
+    }
+}
+
+impl DegradationHandler<'_> {
+    /// A convenience function that takes a [`DegradationAction`] and returns a [`DegradationHandler`].
+    pub fn new_with(action: DegradationAction) -> Self {
+        Self::new(move |_, _| action)
     }
 }
 
@@ -106,12 +236,14 @@ impl core::error::Error for LoanError {}
 pub enum SendError {
     /// Send was called but the corresponding port went already out of scope.
     ConnectionBrokenSinceSenderNoLongerExists,
-    /// A connection between two ports has been corrupted.
+    /// A connection between two ports has been corrupted and the data could not be delivered to all receivers.
     ConnectionCorrupted,
     /// A failure occurred while acquiring memory for the payload
     LoanError(LoanError),
     /// A failure occurred while establishing a connection to the ports counterpart port.
     ConnectionError(ConnectionFailure),
+    /// The data could not be delivered to all receivers.
+    UnableToDeliver,
     /// An internal mechanisms failed and the data could not be delivered to all receivers.
     InternalError,
 }

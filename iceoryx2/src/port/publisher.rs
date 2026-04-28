@@ -28,7 +28,7 @@
 //!     // defines how many samples can be loaned in parallel
 //!     .max_loaned_samples(5)
 //!     // defines behavior when subscriber queue is full in an non-overflowing service
-//!     .unable_to_deliver_strategy(UnableToDeliverStrategy::DiscardSample)
+//!     .unable_to_deliver_strategy(UnableToDeliverStrategy::DiscardData)
 //!     .create()?;
 //!
 //! // loan some initialized memory and send it
@@ -73,7 +73,7 @@
 //!     // defines how many samples can be loaned in parallel
 //!     .max_loaned_samples(5)
 //!     // defines behavior when subscriber queue is full in an non-overflowing service
-//!     .unable_to_deliver_strategy(UnableToDeliverStrategy::DiscardSample)
+//!     .unable_to_deliver_strategy(UnableToDeliverStrategy::DiscardData)
 //!     .create()?;
 //!
 //! // loan some initialized memory and send it
@@ -452,7 +452,8 @@ impl<
                     enable_safe_overflow: static_config.enable_safe_overflow,
                     number_of_samples,
                     max_number_of_segments,
-                    degradation_callback: publisher_factory.degradation_callback,
+                    degradation_handler: publisher_factory.degradation_handler,
+                    unable_to_deliver_handler: publisher_factory.unable_to_deliver_handler,
                     service_state: service.clone(),
                     tagger: CyclicTagger::new(),
                     loan_counter: AtomicUsize::new(0),

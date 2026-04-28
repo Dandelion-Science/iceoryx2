@@ -207,18 +207,18 @@ def test_defaults_request_response_client_unable_to_deliver_strategy_can_be_set(
 ):
     sut = iox2.config.default()
     sut.defaults.request_response.client_unable_to_deliver_strategy = (
-        iox2.UnableToDeliverStrategy.Block
+        iox2.UnableToDeliverStrategy.RetryUntilDelivered
     )
     assert (
         sut.defaults.request_response.client_unable_to_deliver_strategy
-        == iox2.UnableToDeliverStrategy.Block
+        == iox2.UnableToDeliverStrategy.RetryUntilDelivered
     )
     sut.defaults.request_response.client_unable_to_deliver_strategy = (
-        iox2.UnableToDeliverStrategy.DiscardSample
+        iox2.UnableToDeliverStrategy.DiscardData
     )
     assert (
         sut.defaults.request_response.client_unable_to_deliver_strategy
-        == iox2.UnableToDeliverStrategy.DiscardSample
+        == iox2.UnableToDeliverStrategy.DiscardData
     )
 
 
@@ -227,18 +227,18 @@ def test_defaults_request_response_server_unable_to_deliver_strategy_can_be_set(
 ):
     sut = iox2.config.default()
     sut.defaults.request_response.server_unable_to_deliver_strategy = (
-        iox2.UnableToDeliverStrategy.Block
+        iox2.UnableToDeliverStrategy.RetryUntilDelivered
     )
     assert (
         sut.defaults.request_response.server_unable_to_deliver_strategy
-        == iox2.UnableToDeliverStrategy.Block
+        == iox2.UnableToDeliverStrategy.RetryUntilDelivered
     )
     sut.defaults.request_response.server_unable_to_deliver_strategy = (
-        iox2.UnableToDeliverStrategy.DiscardSample
+        iox2.UnableToDeliverStrategy.DiscardData
     )
     assert (
         sut.defaults.request_response.server_unable_to_deliver_strategy
-        == iox2.UnableToDeliverStrategy.DiscardSample
+        == iox2.UnableToDeliverStrategy.DiscardData
     )
 
 
@@ -395,18 +395,18 @@ def test_defaults_publish_subscribe_enable_safe_overflow_can_be_set() -> None:
 def test_defaults_publish_subscribe_unable_to_deliver_strategy_can_be_set() -> None:
     sut = iox2.config.default()
     sut.defaults.publish_subscribe.unable_to_deliver_strategy = (
-        iox2.UnableToDeliverStrategy.Block
+        iox2.UnableToDeliverStrategy.RetryUntilDelivered
     )
     assert (
         sut.defaults.publish_subscribe.unable_to_deliver_strategy
-        == iox2.UnableToDeliverStrategy.Block
+        == iox2.UnableToDeliverStrategy.RetryUntilDelivered
     )
     sut.defaults.publish_subscribe.unable_to_deliver_strategy = (
-        iox2.UnableToDeliverStrategy.DiscardSample
+        iox2.UnableToDeliverStrategy.DiscardData
     )
     assert (
         sut.defaults.publish_subscribe.unable_to_deliver_strategy
-        == iox2.UnableToDeliverStrategy.DiscardSample
+        == iox2.UnableToDeliverStrategy.DiscardData
     )
 
 

@@ -27,7 +27,7 @@
 //!
 //! let server = service.server_builder()
 //!    // defines behavior when client queue is full in a non-overflowing service
-//!    .unable_to_deliver_strategy(UnableToDeliverStrategy::DiscardSample)
+//!    .unable_to_deliver_strategy(UnableToDeliverStrategy::DiscardData)
 //!    .create()?;
 //!
 //! while let Some(active_request) = server.receive()? {
@@ -342,7 +342,7 @@ impl<
             } else {
                 None
             },
-            degradation_callback: server_factory.request_degradation_callback,
+            degradation_handler: server_factory.request_degradation_handler,
             number_of_channels: 1,
             connection_storage: UnsafeCell::new(SlotMap::new(number_of_connections)),
             initial_channel_state: CHANNEL_STATE_OPEN,
@@ -403,7 +403,8 @@ impl<
             enable_safe_overflow: static_config.enable_safe_overflow_for_responses,
             number_of_samples: number_of_responses,
             max_number_of_segments,
-            degradation_callback: server_factory.response_degradation_callback,
+            degradation_handler: server_factory.response_degradation_handler,
+            unable_to_deliver_handler: server_factory.unable_to_deliver_handler,
             service_state: service.clone(),
             tagger: CyclicTagger::new(),
             loan_counter: AtomicUsize::new(0),

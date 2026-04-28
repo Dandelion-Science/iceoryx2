@@ -45,6 +45,8 @@
   the trait impl and enforce all invariants (`#[repr(C)]`, no padding, field
   bounds) at compile time
   [#1547](https://github.com/eclipse-iceoryx/iceoryx2/issues/1547)
+* Enhance degradation handler and add unable to deliver handler
+  [#1573](https://github.com/eclipse-iceoryx/iceoryx2/issues/1573)
 
 ### Bugfixes
 
@@ -86,7 +88,7 @@
   feature aliases in the `iceoryx2` crate
   [#1369](https://github.com/eclipse-iceoryx/iceoryx2/issues/1369)
 * Resources cannot always be cleaned up with `dev_permissions` feature flag
-  [#1365](https://github.com/eclipse-iceoryx/iceoryx2/issues/1370)
+  [#1370](https://github.com/eclipse-iceoryx/iceoryx2/issues/1370)
 * Add `update_connection` to Python bindings
   [#1380](https://github.com/eclipse-iceoryx/iceoryx2/issues/1380)
 * Add `Config::setup_global_config_from_file` to C++ bindings
@@ -310,7 +312,88 @@
     ```rust
     // old
     use iceoryx2_tunnel::{Config, Tunnel};
-    
+
     // new
     use iceoryx2_services_tunnel::{Config, Tunnel};
+    ```
+
+1. The `UnableToDeliveryStrategy` enum tags are renamed to from `Block` and
+   `DiscardSample` to `RetryUntilDelivered` and `DiscardData`.
+
+    ```rust
+    // old
+    service
+        .publisher_builder()
+        .unable_to_deliver_strategy(UnableToDeliverStrategy::Block)
+        .create()?;
+
+    // new
+    service
+        .publisher_builder()
+        .unable_to_deliver_strategy(UnableToDeliverStrategy::RetryUntilDelivered)
+        .create()?;
+    ```
+
+1. The `DegradationCallback` was renamed to `DegradationHandler`, as well as its
+   setters and the parameter changed from port IDs to `DegradationCause` and
+   `DegradationInfo`
+
+    ```rust
+    /// old
+    pub_sub_service
+        .publisher_builder()
+        .set_degradation_callback(|sender_port_id, receiver_port_id| /* ... */)
+        .create()?
+    pub_sub_service
+        .subscriber_builder()
+        .set_degradation_callback(|sender_port_id, receiver_port_id| /* ... */)
+        .create()?
+
+    request_response_service
+        .client_builder()
+        .set_request_degradation_callback(|sender_port_id, receiver_port_id| /* ... */)
+        .set_response_degradation_callback(|sender_port_id, receiver_port_id| /* ... */)
+        .create()?
+    request_response_service
+        .server_builder()
+        .set_request_degradation_callback(|sender_port_id, receiver_port_id| /* ... */)
+        .set_response_degradation_callback(|sender_port_id, receiver_port_id| /* ... */)
+        .create()?
+
+    /// new
+    pub_sub_service
+        .publisher_builder()
+        .set_degradation_handler(|cause, info| /* ... */)
+        .create()?
+    pub_sub_service
+        .subscriber_builder()
+        .set_degradation_handler(|cause, info| /* ... */)
+        .create()?
+
+    request_response_service
+        .client_builder()
+        .set_request_degradation_handler(|cause, info| /* ... */)
+        .set_response_degradation_handler(/* ... */)
+        .create()?
+    request_response_service
+        .server_builder()
+        .set_request_degradation_handler(|cause, info|/* ... */)
+        .set_response_degradation_handler(|cause, info|/* ... */)
+        .create()?
+    ```
+
+1. The `DegradationAction::Fail` was renamed to `DegradationAction::DegradeAndFail`.
+
+    ```rust
+    // old
+    service
+        .publisher_builder()
+        .set_degradation_callback(|_, _| DegradationAction::Fail)
+        .create()?;
+
+    // new
+    service
+        .publisher_builder()
+        .set_degradation_handler(|_, _| DegradationAction::DegradeAndFail)
+        .create()?;
     ```

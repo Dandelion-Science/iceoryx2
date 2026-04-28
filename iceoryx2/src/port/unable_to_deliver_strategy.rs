@@ -16,11 +16,11 @@ use serde::{Deserialize, Serialize, de::Visitor};
 /// and the service does not overflow.
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub enum UnableToDeliverStrategy {
-    /// Blocks until the receiver has consumed the
-    /// data from the buffer and there is space again
-    Block,
-    /// Do not deliver the data.
-    DiscardSample,
+    /// Retries until the receiver has consumed some
+    /// data from the full buffer and there is space again
+    RetryUntilDelivered,
+    /// Do not deliver the data to receiver with a full buffer
+    DiscardData,
 }
 
 impl Serialize for UnableToDeliverStrategy {
@@ -38,7 +38,7 @@ impl Visitor<'_> for UnableToDeliverStrategyVisitor {
     type Value = UnableToDeliverStrategy;
 
     fn expecting(&self, formatter: &mut core::fmt::Formatter) -> core::fmt::Result {
-        formatter.write_str("a string containing either 'Block' or 'DiscardSample'")
+        formatter.write_str("a string containing either 'RetryUntilDelivered' or 'DiscardData'")
     }
 
     fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
@@ -46,8 +46,8 @@ impl Visitor<'_> for UnableToDeliverStrategyVisitor {
         E: serde::de::Error,
     {
         match v {
-            "Block" => Ok(UnableToDeliverStrategy::Block),
-            "DiscardSample" => Ok(UnableToDeliverStrategy::DiscardSample),
+            "DiscardData" => Ok(UnableToDeliverStrategy::DiscardData),
+            "RetryUntilDelivered" => Ok(UnableToDeliverStrategy::RetryUntilDelivered),
             v => Err(E::custom(alloc::format!(
                 "Invalid UnableToDeliverStrategy provided: \"{v:?}\"."
             ))),
